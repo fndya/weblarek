@@ -41,3 +41,8 @@ export interface IOrderResponse {
   id: string;            // id заказа
   total: number;
 }
+
+export interface IProductsListResponse {
+  total: number;
+  items: IProduct[];
+}

@@ -5,6 +5,7 @@ import { ProductModel } from './components/Models/ProductModel';
 import { CartModel } from './components/Models/CartModel';
 import { BuyerModel } from './components/Models/BuyerModel';
 import { ShopApi } from './components/Models/ShopApi';
+import { Api } from './components/base/Api';
 
 import { apiProducts } from './utils/data'; 
 import type { IProduct, IBuyer } from './types';
@@ -52,10 +53,13 @@ buyerModel.set({ phone: '+7 999 000-00-00' });
 console.log('Данные покупателя (частичные):', buyerModel.get());
 console.log('Ошибки валидации (ожидаем пусто):', buyerModel.validate());
 
-// 5) Коммуникационный слой:
-const shopApi = new ShopApi(API_ORIGIN, {
+// 5) Коммуникационный слой: создаём экземпляр базового Api
+const baseApi = new Api(API_ORIGIN, {
   headers: { 'Content-Type': 'application/json' },
 });
+
+// передаём его в ShopApi
+const shopApi = new ShopApi(baseApi);
 
 (async () => {
   try {
