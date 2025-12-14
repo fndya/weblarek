@@ -1,8 +1,10 @@
-// src/components/Models/CartModel.ts
 import type { IProduct } from '../../types';
+import type { IEvents } from '../base/Events';
 
 export class CartModel {
   private basket: IProduct[] = [];
+
+  constructor(private readonly events: IEvents) {}
 
   // все товары в корзине
   public getItems(): IProduct[] {
@@ -13,20 +15,23 @@ export class CartModel {
   public addItem(product: IProduct): void {
     if (!this.has(product.id)) {
       this.basket.push(product);
+      this.emitChange();
     }
   }
 
   // удалить товар по id
   public removeItem(id: string): void {
     this.basket = this.basket.filter((p) => p.id !== id);
+    this.emitChange();
   }
 
   // очистить корзину
   public clear(): void {
     this.basket = [];
+    this.emitChange();
   }
 
-  // сумма всех товаров (null-цена не учитывается)
+  // сумма всех товаров
   public getTotal(): number {
     return this.basket.reduce((sum, p) => sum + (p.price ?? 0), 0);
   }
@@ -39,5 +44,13 @@ export class CartModel {
   // товар уже в корзине?
   public has(id: string): boolean {
     return this.basket.some((p) => p.id === id);
+  }
+
+  private emitChange(): void {
+    this.events.emit('basket:changed', {
+      items: this.getItems(),
+      total: this.getTotal(),
+      count: this.getCount(),
+    });
   }
 }

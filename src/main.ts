@@ -12,10 +12,14 @@ import type { IProduct, IBuyer } from './types';
 
 const API_ORIGIN = import.meta.env.VITE_API_ORIGIN as string;
 
+import { EventEmitter } from './components/base/Events';
+
+const events = new EventEmitter();
+
 // 1) Создаём экземпляры моделей
-const productModel = new ProductModel();
-const cartModel = new CartModel();
-const buyerModel = new BuyerModel();
+const productModel = new ProductModel(events);
+const cartModel = new CartModel(events);
+const buyerModel = new BuyerModel(events);
 
 console.log('--- ТЕСТЫ МОДЕЛЕЙ НА ЛОКАЛЬНЫХ ДАННЫХ ---');
 

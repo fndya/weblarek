@@ -1,20 +1,21 @@
-// src/components/Models/BuyerModel.ts
 import type { IBuyer } from '../../types';
+import type { IEvents } from '../base/Events';
 
 type BuyerPartial = Partial<IBuyer>;
-
-// объект ошибок валидации: только для полей с ошибками
 export type BuyerValidationErrors = Partial<Record<keyof IBuyer, string>>;
 
 export class BuyerModel {
   private data: BuyerPartial = {};
 
-  // сохранить частичные данные (не затирая остальные)
+  constructor(private readonly events: IEvents) {}
+
+  // сохранить частичные данные
   public set(partial: BuyerPartial): void {
     this.data = { ...this.data, ...partial };
+    this.emitChange();
   }
 
-  // получить все сохранённые на текущий момент данные
+  // получить все сохранённые данные
   public get(): BuyerPartial {
     return { ...this.data };
   }
@@ -22,10 +23,10 @@ export class BuyerModel {
   // очистить всё
   public clear(): void {
     this.data = {};
+    this.emitChange();
   }
 
-  // простая валидация по ТЗ: поле валидно, если оно НЕ пустое
-  // возвращаем объект только с ошибочными полями
+  // валидация
   public validate(): BuyerValidationErrors {
     const errors: BuyerValidationErrors = {};
     const { payment, address, email, phone } = this.data;
@@ -36,5 +37,12 @@ export class BuyerModel {
     if (!phone?.trim()) errors.phone = 'Укажите телефон';
 
     return errors;
+  }
+
+  private emitChange(): void {
+    this.events.emit('buyer:changed', {
+      data: this.get(),
+      errors: this.validate(),
+    });
   }
 }
