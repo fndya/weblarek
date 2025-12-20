@@ -7,30 +7,21 @@ export class ProductModel {
 
   constructor(private readonly events: IEvents) {}
 
-  // сохранить массив товаров
-  public setItems(items: IProduct[]): void {
-    this.items = Array.isArray(items) ? items.slice() : [];
-    this.events.emit('catalog:changed', { items: this.getItems() });
+  setItems(items: IProduct[]): void {
+    this.items = items;
+    this.events.emit('catalog:changed'); // ❗ КРИТИЧНО
   }
 
-  // получить весь каталог
-  public getItems(): IProduct[] {
-    return this.items.slice();
+  getItems(): IProduct[] {
+    return this.items;
   }
 
-  // получить один товар по id
-  public getItem(id: string): IProduct | undefined {
-    return this.items.find((p) => p.id === id);
-  }
-
-  // сохранить товар для подробного просмотра
-  public setPreview(product: IProduct | null): void {
+  setPreview(product: IProduct): void {
     this.preview = product;
-    this.events.emit('product:selected', { product });
+    this.events.emit('preview:changed');
   }
 
-  // получить товар для подробного просмотра
-  public getPreview(): IProduct | null {
+  getPreview(): IProduct | null {
     return this.preview;
   }
 }

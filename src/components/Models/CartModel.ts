@@ -6,51 +6,40 @@ export class CartModel {
 
   constructor(private readonly events: IEvents) {}
 
-  // все товары в корзине
-  public getItems(): IProduct[] {
-    return this.basket.slice();
+  getItems(): IProduct[] {
+    return [...this.basket];
   }
 
-  // добавить товар
-  public addItem(product: IProduct): void {
+  addItem(product: IProduct): void {
     if (!this.has(product.id)) {
       this.basket.push(product);
       this.emitChange();
     }
   }
 
-  // удалить товар по id
-  public removeItem(id: string): void {
+  removeItem(id: string): void {
     this.basket = this.basket.filter((p) => p.id !== id);
     this.emitChange();
   }
 
-  // очистить корзину
-  public clear(): void {
+  clear(): void {
     this.basket = [];
     this.emitChange();
   }
 
-  // сумма всех товаров
-  public getTotal(): number {
+  getTotal(): number {
     return this.basket.reduce((sum, p) => sum + (p.price ?? 0), 0);
   }
 
-  // количество позиций
-  public getCount(): number {
+  getCount(): number {
     return this.basket.length;
   }
 
-  // товар уже в корзине?
-  public has(id: string): boolean {
+  has(id: string): boolean {
     return this.basket.some((p) => p.id === id);
   }
 
   private emitChange(): void {
-    this.events.emit('basket:changed', {
-      items: this.getItems(),
-      total: this.getTotal(),
-      count: this.getCount(),
-    });
+    this.events.emit('basket:changed');
   }
 }

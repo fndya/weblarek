@@ -1,88 +1,117 @@
 import './scss/styles.scss';
 
-// src/main.ts
-import { ProductModel } from './components/Models/ProductModel';
-import { CartModel } from './components/Models/CartModel';
-import { BuyerModel } from './components/Models/BuyerModel';
-import { ShopApi } from './components/Models/ShopApi';
+import { EventEmitter } from './components/base/Events';
 import { Api } from './components/base/Api';
 
-import { apiProducts } from './utils/data'; 
-import type { IProduct, IBuyer } from './types';
+import { ProductModel } from './components/Models/ProductModel';
+import { CartModel } from './components/Models/CartModel';
+//import { BuyerModel } from './components/Models/BuyerModel';
+import { ShopApi } from './components/Models/ShopApi';
 
-const API_ORIGIN = import.meta.env.VITE_API_ORIGIN as string;
+import { Header } from './components/view/Header';
+import { Gallery } from './components/view/Gallery';
+//import { Modal } from './components/view/Modal';
+import { CatalogCard } from './components/view/cards/CatalogCard';
 
-import { EventEmitter } from './components/base/Events';
+import { API_URL } from './utils/constants';
+import type { IProduct } from './types';
 
 const events = new EventEmitter();
 
-// 1) Создаём экземпляры моделей
-const productModel = new ProductModel(events);
-const cartModel = new CartModel(events);
-const buyerModel = new BuyerModel(events);
-
-console.log('--- ТЕСТЫ МОДЕЛЕЙ НА ЛОКАЛЬНЫХ ДАННЫХ ---');
-
-// 2) ProductModel: сохранить и прочитать список (локальные данные)
-productModel.setItems(apiProducts.items as IProduct[]);
-console.log('Каталог (локальные данные):', productModel.getItems());
-
-
-const firstId = productModel.getItems()[0]?.id;
-if (firstId) {
-  const first = productModel.getItem(firstId)!;
-  productModel.setPreview(first);
-  console.log('Товар для подробного просмотра:', productModel.getPreview());
-}
-
-// 3) CartModel: 
-if (firstId) {
-  const first = productModel.getItem(firstId)!;
-  cartModel.addItem(first);
-  console.log('Корзина после добавления:', cartModel.getItems());
-  console.log('Есть товар в корзине?', cartModel.has(firstId));
-  console.log('Счётчик корзины:', cartModel.getCount());
-  console.log('Сумма корзины:', cartModel.getTotal());
-  cartModel.removeItem(firstId);
-  console.log('Корзина после удаления:', cartModel.getItems());
-  console.log('Счётчик корзины:', cartModel.getCount());
-  console.log('Сумма корзины:', cartModel.getTotal());
-}
-
-// 4) BuyerModel: 
-buyerModel.set({ payment: 'card' });
-buyerModel.set({ address: 'Невский пр., 1' });
-buyerModel.set({ email: 'test@example.com' });
-buyerModel.set({ phone: '+7 999 000-00-00' });
-console.log('Данные покупателя (частичные):', buyerModel.get());
-console.log('Ошибки валидации (ожидаем пусто):', buyerModel.validate());
-
-// 5) Коммуникационный слой: создаём экземпляр базового Api
-const baseApi = new Api(API_ORIGIN, {
+// API
+const api = new Api(API_URL, {
   headers: { 'Content-Type': 'application/json' },
 });
+const shopApi = new ShopApi(api);
 
-// передаём его в ShopApi
-const shopApi = new ShopApi(baseApi);
+// Models
+const productModel = new ProductModel(events);
+const cartModel = new CartModel(events);
+//const buyerModel = new BuyerModel(events);
 
+// View
+const header = new Header(
+  document.querySelector('.header') as HTMLElement,
+  events
+);
+const gallery = new Gallery(
+  document.querySelector('.gallery') as HTMLElement
+);
+// const modal = new Modal(
+//   document.querySelector('.modal') as HTMLElement,
+//   events
+// );
+
+// helpers
+const tplCatalog = document.querySelector(
+  '#card-catalog'
+) as HTMLTemplateElement;
+
+function renderCatalog(): void {
+  const cards = productModel.getItems().map((product: IProduct) => {
+    const node = tplCatalog.content.firstElementChild!.cloneNode(
+      true
+    ) as HTMLElement;
+
+    const card = new CatalogCard(node, {
+      onSelect: () => productModel.setPreview(product),
+      //onAdd: () => cartModel.addItem(product),
+    });
+
+    card.render({
+     title: product.title,
+     price: product.price,
+    });
+    card.category = product.category;
+    card.image = product.image;
+
+    return card.render();
+  });
+
+  gallery.render({ items: cards });
+}
+
+function renderHeader(): void {
+  header.render({ count: cartModel.getCount() });
+}
+
+// Events
+events.on('catalog:changed', renderCatalog);
+events.on('basket:changed', renderHeader);
+
+events.on('preview:changed', () => {
+  // сюда позже превью
+});
+
+events.on('basket:open', () => {
+  // сюда позже корзину
+});
+
+// init
 (async () => {
-  try {
-    // Загрузка каталога с сервера
-    const serverProducts = await shopApi.getProducts();
-    productModel.setItems(serverProducts);
-    console.log('Каталог (с сервера):', productModel.getItems());
-
-    // Пример подготовки данных заказа
-    const selectable = productModel.getItems().filter((p) => p.price !== null).slice(0, 2);
-    selectable.forEach((p) => cartModel.addItem(p));
-
-    const buyer = buyerModel.get() as IBuyer;
-    const itemIds = cartModel.getItems().map((p) => p.id);
-    const total = cartModel.getTotal();
-
-    console.log('Готово к отправке (buyer, items, total):', buyer, itemIds, total);
-
-  } catch (e) {
-    console.error('Ошибка при работе с API:', e);
-  }
+  const products = await shopApi.getProducts();
+  console.log('PRODUCTS FROM API:', products);
+  productModel.setItems(products);
+  renderHeader();
 })();
+
+const galleryRoot = document.querySelector('.gallery');
+
+if (!galleryRoot) {
+  throw new Error('Gallery root not found');
+}
+gallery.render({
+  items: [
+    document.createElement('div')
+  ]
+});
+
+const testDiv = document.createElement('div');
+  testDiv.textContent = 'TEST RENDER';
+  testDiv.style.color = 'red';
+
+  gallery.render({
+    items: [testDiv],
+});
+
+

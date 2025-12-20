@@ -9,25 +9,21 @@ export class BuyerModel {
 
   constructor(private readonly events: IEvents) {}
 
-  // сохранить частичные данные
-  public set(partial: BuyerPartial): void {
+  set(partial: BuyerPartial): void {
     this.data = { ...this.data, ...partial };
     this.emitChange();
   }
 
-  // получить все сохранённые данные
-  public get(): BuyerPartial {
+  get(): BuyerPartial {
     return { ...this.data };
   }
 
-  // очистить всё
-  public clear(): void {
+  clear(): void {
     this.data = {};
     this.emitChange();
   }
 
-  // валидация
-  public validate(): BuyerValidationErrors {
+  validate(): BuyerValidationErrors {
     const errors: BuyerValidationErrors = {};
     const { payment, address, email, phone } = this.data;
 
@@ -40,9 +36,6 @@ export class BuyerModel {
   }
 
   private emitChange(): void {
-    this.events.emit('buyer:changed', {
-      data: this.get(),
-      errors: this.validate(),
-    });
+    this.events.emit('buyer:changed');
   }
 }

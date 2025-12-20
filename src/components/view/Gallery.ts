@@ -1,12 +1,11 @@
 import { Component } from '../base/Component';
 
-export class Gallery extends Component<HTMLElement[]> {
-  constructor(container: HTMLElement) {
-    super(container);
-  }
+interface GalleryData {
+  items: HTMLElement[];
+}
 
-  render(cards: HTMLElement[] = []): HTMLElement {
-    this.container.replaceChildren(...cards);
-    return this.container;
+export class Gallery extends Component<GalleryData> {
+  set items(value: HTMLElement[]) {
+    this.container.replaceChildren(...value);
   }
 }

@@ -1,21 +1,29 @@
+// src/components/view/cards/BasketCard.ts
 import { Card } from '../base/Card';
-import type { IProduct } from '../../../types';
-import type { IEvents } from '../../base/Events';
 
-export class BasketCard extends Card<IProduct> {
+interface BasketCardActions {
+  onRemove: () => void;
+}
+
+export class BasketCard extends Card {
+  private indexEl: HTMLElement;
+  private buttonEl: HTMLButtonElement;
+
   constructor(
     container: HTMLElement,
-    events: IEvents
+    private readonly actions: BasketCardActions
   ) {
-    super(container, events);
+    super(container);
 
-    // в корзине кнопка всегда "Удалить"
-    if (this.button) {
-      this.button.textContent = 'Удалить';
+    this.indexEl = container.querySelector('.basket__item-index')!;
+    this.buttonEl = container.querySelector('.basket__item-delete')!;
 
-      this.button.addEventListener('click', () => {
-        this.events.emit('product:remove', { id: this.productId });
-      });
-    }
+    this.buttonEl.addEventListener('click', () => {
+      this.actions.onRemove();
+    });
+  }
+
+  set index(value: number) {
+    this.indexEl.textContent = String(value);
   }
 }

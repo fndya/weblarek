@@ -1,20 +1,34 @@
+// src/components/view/cards/CatalogCard.ts
 import { Card } from '../base/Card';
-import type { IProduct } from '../../../types';
-import type { IEvents } from '../../base/Events';
+import { CDN_URL } from '../../../utils/constants';
 
-export class CatalogCard extends Card<IProduct> {
+interface CatalogCardActions {
+  onSelect: () => void;
+}
+
+export class CatalogCard extends Card {
+  private imageEl!: HTMLImageElement;
+  private categoryEl!: HTMLElement;
+
   constructor(
     container: HTMLElement,
-    events: IEvents
+    private readonly actions: CatalogCardActions
   ) {
-    super(container, events);
+    super(container);
 
-    // клик по карточке — открыть превью
+    this.imageEl = container.querySelector('.card__image')!;
+    this.categoryEl = container.querySelector('.card__category')!;
+
     this.container.addEventListener('click', () => {
-      this.events.emit('card:select', { id: this.productId });
+      this.actions.onSelect();
     });
+  }
 
-    // кнопка «Купить»
-    this.bindButton('product:add');
+  set image(value: string) {
+    this.imageEl.src = `${CDN_URL}${value}`;
+  }
+
+  set category(value: string) {
+    this.categoryEl.textContent = value;
   }
 }

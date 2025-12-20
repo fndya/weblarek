@@ -1,41 +1,21 @@
 // src/components/Models/ShopApi.ts
-import type {
-  IProduct,
-  IBuyer,
-  IOrderRequestApi,
-  IOrderResponse,
-  TPayment,
-  IProductsListResponse,
-  IApi
-} from '../../types';
+import type { IProduct } from '../../types';
+import { Api } from '../base/Api';
+
+interface ProductsResponse {
+  total: number;
+  items: IProduct[];
+}
 
 export class ShopApi {
-  constructor(private api: IApi) {}
+  constructor(private readonly api: Api) {}
 
-  private mapPayment(payment: TPayment): IOrderRequestApi['payment'] {
-    return payment === 'card' ? 'online' : 'cash';
-  }
-
-  public async getProducts(): Promise<IProduct[]> {
-    const res = await this.api.get<IProductsListResponse>('/product/');
+  async getProducts(): Promise<IProduct[]> {
+    const res = await this.api.get<ProductsResponse>('/product');
     return res.items;
   }
 
-  public async getProduct(id: string): Promise<IProduct> {
-    const res = await this.api.get<IProduct>(`/product/${id}`);
-    return res;
-  }
-
-  public async postOrder(buyer: IBuyer, items: string[], total: number): Promise<IOrderResponse> {
-    const payload: IOrderRequestApi = {
-      payment: this.mapPayment(buyer.payment),
-      email: buyer.email,
-      phone: buyer.phone,
-      address: buyer.address,
-      total,
-      items,
-    };
-    const res = await this.api.post<IOrderResponse>('/order', payload);
-    return res;
+  order(data: Record<string, unknown>): Promise<unknown> {
+    return this.api.post('/order', data);
   }
 }

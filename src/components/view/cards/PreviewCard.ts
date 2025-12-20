@@ -1,42 +1,45 @@
+// src/components/view/cards/PreviewCard.ts
 import { Card } from '../base/Card';
-import type { IProduct } from '../../../types';
-import type { IEvents } from '../../base/Events';
+import { CDN_URL } from '../../../utils/constants';
 
-type PreviewCardData = IProduct & {
-  inBasket: boolean;
-};
+interface PreviewCardActions {
+  onBuy: () => void;
+  onRemove: () => void;
+}
 
-export class PreviewCard extends Card<PreviewCardData> {
+export class PreviewCard extends Card {
+  private descriptionEl: HTMLElement;
+  private buttonEl: HTMLButtonElement;
+  private imageEl!: HTMLImageElement;
+
   constructor(
     container: HTMLElement,
-    events: IEvents
+    private readonly actions: PreviewCardActions
   ) {
-    super(container, events);
+    super(container);
 
-    // кнопка Купить / Удалить
-    this.button?.addEventListener('click', () => {
-      if (!this.productId) return;
+    
+    this.descriptionEl = container.querySelector('.card__text')!;
+    this.buttonEl = container.querySelector('.card__button')!;
 
-      this.events.emit(
-        this.button?.textContent === 'Удалить'
-          ? 'product:remove'
-          : 'product:add',
-        { id: this.productId }
-      );
-
-      // закрыть модалку после действия
-      this.events.emit('modal:close');
+    this.buttonEl.addEventListener('click', () => {
+      if (this.buttonEl.textContent === 'Удалить') {
+        this.actions.onRemove();
+      } else {
+        this.actions.onBuy();
+      }
     });
   }
 
-  render(data?: Partial<PreviewCardData>): HTMLElement {
-    super.render(data);
+  set description(value: string) {
+    this.descriptionEl.textContent = value;
+  }
 
-    // состояние кнопки
-    if (this.button && typeof data?.inBasket === 'boolean') {
-      this.button.textContent = data.inBasket ? 'Удалить' : 'Купить';
-    }
+  set image(value: string) {
+    this.imageEl.src = `${CDN_URL}${value}`;
+  }
 
-    return this.container;
+  set inBasket(value: boolean) {
+    this.buttonEl.textContent = value ? 'Удалить' : 'Купить';
   }
 }
