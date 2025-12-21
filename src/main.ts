@@ -4,6 +4,7 @@ import { EventEmitter } from './components/base/Events';
 import { Api } from './components/base/Api';
 
 import { ProductModel } from './components/Models/ProductModel';
+import { BuyerModel } from './components/Models/BuyerModel';
 import { CartModel } from './components/Models/CartModel';
 import { ShopApi } from './components/Models/ShopApi';
 
@@ -21,6 +22,9 @@ import { Header } from './components/view/Header';
 import { BasketCard } from './components/view/cards/BasketCard';
 import { Basket } from './components/view/Basket';
 
+import { OrderPaymentForm } from './components/view/forms/OrderPaymentForm';
+import { OrderContactsForm } from './components/view/forms/OrderContactsForm';
+
 /* =====================
    ИНИЦИАЛИЗАЦИЯ
 ===================== */
@@ -36,6 +40,7 @@ const shopApi = new ShopApi(api);
 // модели
 const productModel = new ProductModel(events);
 const cartModel = new CartModel(events);
+const buyerModel = new BuyerModel(events);
 
 // view
 const galleryRoot = document.querySelector<HTMLElement>('.gallery')!;
@@ -230,4 +235,115 @@ events.on('product:remove', (data) => {
   cartModel.removeItem(id);
   events.emit('modal:close');
 });
+
+/* =====================
+   ФОРМА ОПЛАТЫ
+===================== */
+let orderPaymentForm: OrderPaymentForm | null = null;
+
+
+events.on('order:open', () => {
+  const tpl = document.querySelector<HTMLTemplateElement>('#order')!;
+  const node = tpl.content.firstElementChild!.cloneNode(true) as HTMLElement;
+
+  orderPaymentForm = new OrderPaymentForm(node, events);
+
+  orderPaymentForm.render({
+    payment: buyerModel.get().payment,
+    address: buyerModel.get().address,
+    errors: buyerModel.validate(),
+  });
+
+  modal.open(orderPaymentForm.render());
+});
+
+events.on('buyer:changed', () => {
+  const buyer = buyerModel.get();
+  const errors = buyerModel.validate();
+
+  const canSubmit =
+    !errors.payment &&
+    !errors.address &&
+    Boolean(buyer.payment && buyer.address);
+
+  if (contactsForm) {
+    contactsForm.render({
+      email: buyer.email,
+      phone: buyer.phone,
+      errors,
+      canSubmit: !errors.email && !errors.phone,
+    });
+    return;
+  }
+
+  if (orderPaymentForm) {
+    orderPaymentForm.render({
+      payment: buyer.payment,
+      address: buyer.address,
+      errors,
+      canSubmit,
+    });
+  }
+});
+
+
+events.on('form:change', (data) => {
+  const { field, value } = data as { field: string; value: string };
+  buyerModel.set({ [field]: value });
+});
+
+events.on('order:next', () => {
+  const errors = buyerModel.validate();
+
+  if (errors.payment || errors.address) {
+    orderPaymentForm?.render({
+      ...buyerModel.get(),
+      errors,
+    });
+    return;
+  }
+
+  // ⬅️ важно
+  orderPaymentForm = null;
+
+  events.emit('order:contacts');
+});
+
+
+let contactsForm: OrderContactsForm | null = null;
+
+events.on('order:contacts', () => {
+  const tpl = document.querySelector<HTMLTemplateElement>('#contacts')!;
+  const node = tpl.content.firstElementChild!.cloneNode(true) as HTMLElement;
+
+  contactsForm = new OrderContactsForm(node, events);
+
+  const buyer = buyerModel.get();
+  contactsForm.render({
+    email: buyer.email,
+    phone: buyer.phone,
+    errors: buyerModel.validate(),
+  });
+
+  modal.open(contactsForm.render());
+});
+
+events.on('order:pay', async () => {
+  const errors = buyerModel.validate();
+
+  if (errors.email || errors.phone) {
+    if (contactsForm) {
+      contactsForm.render({
+        ...buyerModel.get(),
+        errors,
+      });
+    }
+    return;
+  }
+
+  // дальше: отправка заказа (следующий шаг)
+  // events.emit('order:submit');
+});
+
+
 

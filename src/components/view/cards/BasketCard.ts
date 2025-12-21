@@ -1,6 +1,5 @@
 // src/components/view/cards/BasketCard.ts
 import { Card } from '../base/Card';
-import { categoryMap } from '../../../utils/constants';
 
 interface BasketCardActions {
   onRemove: () => void;
@@ -9,7 +8,6 @@ interface BasketCardActions {
 export class BasketCard extends Card {
   private indexEl: HTMLElement;
   private buttonEl: HTMLButtonElement;
-  private categoryEl!: HTMLElement;
 
   constructor(
     container: HTMLElement,
@@ -27,11 +25,5 @@ export class BasketCard extends Card {
 
   set index(value: number) {
     this.indexEl.textContent = String(value);
-  }
-  set category(value: string) {
-    this.categoryEl.textContent = value;
-    const mapped = categoryMap[value as keyof typeof categoryMap];
-    this.categoryEl.classList.remove('card__category_other');
-    this.categoryEl.classList.add('card__category', `${mapped}`);
   }
 }

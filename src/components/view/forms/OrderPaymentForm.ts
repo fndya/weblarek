@@ -1,13 +1,12 @@
-// src/components/view/forms/OrderPaymentForm.ts
 import { Form } from '../base/Form';
 import type { IEvents } from '../../base/Events';
 
-interface PaymentFormData {
+type PaymentFormData = {
   payment?: string;
   address?: string;
   errors?: Record<string, string>;
   canSubmit?: boolean;
-}
+};
 
 export class OrderPaymentForm extends Form<PaymentFormData> {
   private paymentButtons: HTMLButtonElement[];
@@ -19,18 +18,30 @@ export class OrderPaymentForm extends Form<PaymentFormData> {
       container.querySelectorAll('.button_alt')
     );
 
+    // выбор оплаты
     this.paymentButtons.forEach((button) => {
       button.addEventListener('click', () => {
-        events.emit('form:change', {
+        this.paymentButtons.forEach((b) =>
+          b.classList.remove('button_alt-active')
+        );
+        button.classList.add('button_alt-active');
+
+        this.events.emit('form:change', {
           field: 'payment',
           value: button.dataset.method,
         });
       });
     });
 
-    container.addEventListener('submit', (e: SubmitEvent) => {
+    // переход ко 2 шагу
+    this.container.addEventListener('submit', (e) => {
       e.preventDefault();
-      events.emit('order:next');
+    this.events.emit('order:next');
     });
+
+  }
+
+  set canSubmit(value: boolean | undefined) {
+    this.submitButton.disabled = !value;
   }
 }
