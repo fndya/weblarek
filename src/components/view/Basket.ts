@@ -1,53 +1,39 @@
 import { Component } from '../base/Component';
 import type { IEvents } from '../base/Events';
 
-type BasketData = {
+export interface BasketData {
   items: HTMLElement[];
   total: number;
-};
+  canOrder: boolean;
+}
 
 export class Basket extends Component<BasketData> {
   private list: HTMLElement;
-  private total: HTMLElement;
+  private totalEl: HTMLElement;
   private orderButton: HTMLButtonElement;
-  private empty: HTMLElement;
 
-  constructor(
-    container: HTMLElement,
-    private readonly events: IEvents
-  ) {
+  constructor(container: HTMLElement, private events: IEvents) {
     super(container);
 
     this.list = container.querySelector('.basket__list')!;
-    this.total = container.querySelector('.basket__total-price')!;
+    this.totalEl = container.querySelector('.basket__price')!;
     this.orderButton = container.querySelector('.basket__button')!;
-    this.empty = container.querySelector('.basket__empty')!;
 
-    // открыть оформление заказа
-    this.orderButton.addEventListener('click', () => {
+    this.orderButton.addEventListener('click', (e) => {
+      e.preventDefault();
       this.events.emit('order:open');
     });
   }
 
-  render(data?: Partial<BasketData>): HTMLElement {
-    const items = data?.items ?? [];
+  set items(value: HTMLElement[]) {
+    this.list.replaceChildren(...value);
+  }
 
-    // список товаров
-    if (items.length === 0) {
-      this.list.replaceChildren();
-      this.empty.classList.remove('basket__empty_hidden');
-      this.orderButton.disabled = true;
-    } else {
-      this.list.replaceChildren(...items);
-      this.empty.classList.add('basket__empty_hidden');
-      this.orderButton.disabled = false;
-    }
+  set total(value: number) {
+    this.totalEl.textContent = `${value} синапсов`;
+  }
 
-    // итоговая стоимость
-    if (typeof data?.total === 'number') {
-      this.total.textContent = `${data.total} синапсов`;
-    }
-
-    return super.render(data);
+  set canOrder(value: boolean) {
+    this.orderButton.disabled = !value;
   }
 }

@@ -16,6 +16,11 @@ import { PreviewCard } from './components/view/cards/PreviewCard';
 import { API_URL } from './utils/constants';
 import type { IProduct } from './types';
 
+import { Header } from './components/view/Header';
+
+import { BasketCard } from './components/view/cards/BasketCard';
+import { Basket } from './components/view/Basket';
+
 /* =====================
    ИНИЦИАЛИЗАЦИЯ
 ===================== */
@@ -38,6 +43,10 @@ const modalRoot = document.querySelector<HTMLElement>('.modal')!;
 
 const gallery = new Gallery(galleryRoot);
 const modal = new Modal(modalRoot, events);
+
+const headerEl = document.querySelector('.header') as HTMLElement;
+const header = new Header(headerEl, events);
+
 
 /* =====================
    ЗАГРУЗКА КАТАЛОГА
@@ -137,8 +146,72 @@ events.on('preview:changed', () => {
 });
 
 /* =====================
+   ХЕДЕР СО СЧЕТЧИКОМ
+===================== */
+
+
+events.on('basket:changed', () => {
+  header.render({
+    count: cartModel.getCount(),
+  });
+});
+
+
+/* =====================
    КОРЗИНА
 ===================== */
+
+events.on('basket:open', () => {
+  const items = cartModel.getItems();
+
+  // пустая корзина
+  if (items.length === 0) {
+    const empty = document.createElement('p');
+    empty.textContent = 'Корзина пуста';
+    modal.open(empty);
+    return;
+  }
+
+  // собираем карточки корзины
+  const basketCards = items.map((product) => {
+    const cardTpl = document.querySelector<HTMLTemplateElement>('#card-basket')!;
+    const cardNode = cardTpl.content.firstElementChild!.cloneNode(true) as HTMLElement;
+
+    const card = new BasketCard(cardNode, {
+      onRemove: () => {
+        cartModel.removeItem(product.id);
+      },
+    });
+
+    card.render({
+      title: product.title,
+      price: product.price,
+    });
+
+    return card.render();
+  });
+
+  // собираем корзину
+  const basketTpl = document.querySelector<HTMLTemplateElement>('#basket')!;
+  const basketNode = basketTpl.content.firstElementChild!.cloneNode(true) as HTMLElement;
+
+  const basket = new Basket(basketNode, events);
+  basket.render({
+    items: basketCards,
+    total: cartModel.getTotal(),
+    canOrder: cartModel.getCount() > 0,
+  });
+
+  modal.open(basket.render());
+});
+
+events.on('basket:changed', () => {
+  // если модалка открыта — перерисуем корзину через тот же обработчик
+  if (document.querySelector('.modal')?.classList.contains('modal_active')) {
+    events.emit('basket:open', {});
+  }
+});
+
 
 events.on('product:add', (data) => {
   const { id } = data as { id: string };
