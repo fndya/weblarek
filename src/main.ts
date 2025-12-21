@@ -5,65 +5,75 @@ import { Api } from './components/base/Api';
 
 import { ProductModel } from './components/Models/ProductModel';
 import { CartModel } from './components/Models/CartModel';
-//import { BuyerModel } from './components/Models/BuyerModel';
 import { ShopApi } from './components/Models/ShopApi';
 
-import { Header } from './components/view/Header';
 import { Gallery } from './components/view/Gallery';
-//import { Modal } from './components/view/Modal';
+import { Modal } from './components/view/Modal';
+
 import { CatalogCard } from './components/view/cards/CatalogCard';
+import { PreviewCard } from './components/view/cards/PreviewCard';
 
 import { API_URL } from './utils/constants';
 import type { IProduct } from './types';
 
+/* =====================
+   ИНИЦИАЛИЗАЦИЯ
+===================== */
+
 const events = new EventEmitter();
 
-// API
 const api = new Api(API_URL, {
   headers: { 'Content-Type': 'application/json' },
 });
+
 const shopApi = new ShopApi(api);
 
-// Models
+// модели
 const productModel = new ProductModel(events);
 const cartModel = new CartModel(events);
-//const buyerModel = new BuyerModel(events);
 
-// View
-const header = new Header(
-  document.querySelector('.header') as HTMLElement,
-  events
-);
-const gallery = new Gallery(
-  document.querySelector('.gallery') as HTMLElement
-);
-// const modal = new Modal(
-//   document.querySelector('.modal') as HTMLElement,
-//   events
-// );
+// view
+const galleryRoot = document.querySelector<HTMLElement>('.gallery')!;
+const modalRoot = document.querySelector<HTMLElement>('.modal')!;
 
-// helpers
-const tplCatalog = document.querySelector(
-  '#card-catalog'
-) as HTMLTemplateElement;
+const gallery = new Gallery(galleryRoot);
+const modal = new Modal(modalRoot, events);
 
-function renderCatalog(): void {
+/* =====================
+   ЗАГРУЗКА КАТАЛОГА
+===================== */
+
+(async () => {
+  const products = await shopApi.getProducts();
+  productModel.setItems(products);
+})();
+
+/* =====================
+   РЕНДЕР КАТАЛОГА
+===================== */
+
+function renderCatalog() {
   const cards = productModel.getItems().map((product: IProduct) => {
-    const node = tplCatalog.content.firstElementChild!.cloneNode(
+    const template = document.querySelector<HTMLTemplateElement>(
+      '#card-catalog'
+    )!;
+    const node = template.content.firstElementChild!.cloneNode(
       true
     ) as HTMLElement;
 
     const card = new CatalogCard(node, {
-      onSelect: () => productModel.setPreview(product),
-      //onAdd: () => cartModel.addItem(product),
+      onSelect: () => {
+        events.emit('card:select', { id: product.id });
+      },
     });
 
     card.render({
-     title: product.title,
-     price: product.price,
+      title: product.title,
+      price: product.price,
     });
-    card.category = product.category;
+
     card.image = product.image;
+    card.category = product.category;
 
     return card.render();
   });
@@ -71,47 +81,80 @@ function renderCatalog(): void {
   gallery.render({ items: cards });
 }
 
-function renderHeader(): void {
-  header.render({ count: cartModel.getCount() });
-}
+events.on('catalog:changed', () => {
+  renderCatalog();
+});
 
-// Events
-events.on('catalog:changed', renderCatalog);
-events.on('basket:changed', renderHeader);
+/* =====================
+   ВЫБОР КАРТОЧКИ
+===================== */
+
+events.on('card:select', (data) => {
+  const { id } = data as { id: string };
+
+  const product = productModel.getItems().find((p) => p.id === id);
+  if (!product) return;
+
+  productModel.setPreview(product);
+});
+
+
+/* =====================
+   ПРЕВЬЮ ТОВАРА
+===================== */
 
 events.on('preview:changed', () => {
-  // сюда позже превью
+  const product = productModel.getPreview();
+  if (!product) return;
+
+  const template = document.querySelector<HTMLTemplateElement>(
+    '#card-preview'
+  )!;
+  const node = template.content.firstElementChild!.cloneNode(
+    true
+  ) as HTMLElement;
+
+  const card = new PreviewCard(node, {
+    onBuy: () => {
+      events.emit('product:add', { id: product.id });
+    },
+    onRemove: () => {
+      events.emit('product:remove', { id: product.id });
+    },
+  });
+
+  card.render({
+    title: product.title,
+    price: product.price,
+  });
+
+  card.image = product.image;
+  card.description = product.description;
+  card.inBasket = cartModel.has(product.id);
+  card.category = product.category;
+
+  modal.open(card.render());
 });
 
-events.on('basket:open', () => {
-  // сюда позже корзину
+/* =====================
+   КОРЗИНА
+===================== */
+
+events.on('product:add', (data) => {
+  const { id } = data as { id: string };
+
+  const product = productModel.getItems().find((p) => p.id === id);
+  if (!product) return;
+
+  cartModel.addItem(product);
+  events.emit('modal:close');
 });
 
-// init
-(async () => {
-  const products = await shopApi.getProducts();
-  console.log('PRODUCTS FROM API:', products);
-  productModel.setItems(products);
-  renderHeader();
-})();
 
-const galleryRoot = document.querySelector('.gallery');
+events.on('product:remove', (data) => {
+  const { id } = data as { id: string };
 
-if (!galleryRoot) {
-  throw new Error('Gallery root not found');
-}
-gallery.render({
-  items: [
-    document.createElement('div')
-  ]
+  cartModel.removeItem(id);
+  events.emit('modal:close');
 });
-
-const testDiv = document.createElement('div');
-  testDiv.textContent = 'TEST RENDER';
-  testDiv.style.color = 'red';
-
-  gallery.render({
-    items: [testDiv],
-});
-
 
