@@ -237,9 +237,44 @@ events.on('product:remove', (data) => {
 });
 
 /* =====================
-   ФОРМА ОПЛАТЫ
+   ФОРМЫ
 ===================== */
 let orderPaymentForm: OrderPaymentForm | null = null;
+let contactsForm: OrderContactsForm | null = null;
+
+function getPaymentStepErrors() {
+  const buyer = buyerModel.get();
+  const errors: Record<string, string> = {};
+
+  if (!buyer.payment) {
+    errors.payment = 'Не выбран вид оплаты';
+  }
+
+  if (!buyer.address?.trim()) {
+    errors.address = 'Укажите адрес доставки';
+  }
+
+  return errors;
+}
+
+
+
+
+function getContactsStepErrors() {
+  const buyer = buyerModel.get();
+  const errors: Record<string, string> = {};
+
+  if (!buyer.email?.trim()) {
+    errors.email = 'Укажите e-mail';
+  }
+
+  if (!buyer.phone?.trim()) {
+    errors.phone = 'Укажите телефон';
+  }
+
+  return errors;
+}
+
 
 
 events.on('order:open', () => {
@@ -247,44 +282,79 @@ events.on('order:open', () => {
   const node = tpl.content.firstElementChild!.cloneNode(true) as HTMLElement;
 
   orderPaymentForm = new OrderPaymentForm(node, events);
+  contactsForm = null; // важно: мы сейчас на шаге 1
+
+  const buyer = buyerModel.get();
+  const errors = getPaymentStepErrors();
+  
 
   orderPaymentForm.render({
-    payment: buyerModel.get().payment,
-    address: buyerModel.get().address,
-    errors: buyerModel.validate(),
+    payment: buyer.payment,
+    address: buyer.address,
+    errors,
+    canSubmit: Object.keys(errors).length === 0,
   });
 
   modal.open(orderPaymentForm.render());
 });
 
+
 events.on('buyer:changed', () => {
   const buyer = buyerModel.get();
-  const errors = buyerModel.validate();
-
-  const canSubmit =
-    !errors.payment &&
-    !errors.address &&
-    Boolean(buyer.payment && buyer.address);
 
   if (contactsForm) {
+    const errors = getContactsStepErrors();
+
     contactsForm.render({
       email: buyer.email,
       phone: buyer.phone,
       errors,
-      canSubmit: !errors.email && !errors.phone,
+      canSubmit: Object.keys(errors).length === 0,
     });
     return;
   }
 
+
   if (orderPaymentForm) {
+  const errors = getPaymentStepErrors();
+
     orderPaymentForm.render({
       payment: buyer.payment,
       address: buyer.address,
       errors,
-      canSubmit,
+      canSubmit: Object.keys(errors).length === 0,
     });
   }
+
+
 });
+
+
+
+events.on('order:contacts', () => {
+  const tpl = document.querySelector<HTMLTemplateElement>('#contacts')!;
+  const node = tpl.content.firstElementChild!.cloneNode(true) as HTMLElement;
+
+  orderPaymentForm = null;
+
+  contactsForm = new OrderContactsForm(node, events);
+
+  const buyer = buyerModel.get();
+  const errors = getContactsStepErrors();
+
+  const view = contactsForm.render({
+    email: buyer.email,
+    phone: buyer.phone,
+    errors,
+    canSubmit: Object.keys(errors).length === 0,
+  });
+
+  modal.open(view);
+});
+
+
+
+
 
 
 events.on('form:change', (data) => {
@@ -293,9 +363,9 @@ events.on('form:change', (data) => {
 });
 
 events.on('order:next', () => {
-  const errors = buyerModel.validate();
+  const errors = getPaymentStepErrors();
 
-  if (errors.payment || errors.address) {
+  if (Object.keys(errors).length > 0) {
     orderPaymentForm?.render({
       ...buyerModel.get(),
       errors,
@@ -303,47 +373,14 @@ events.on('order:next', () => {
     return;
   }
 
-  // ⬅️ важно
-  orderPaymentForm = null;
-
   events.emit('order:contacts');
 });
 
 
-let contactsForm: OrderContactsForm | null = null;
 
-events.on('order:contacts', () => {
-  const tpl = document.querySelector<HTMLTemplateElement>('#contacts')!;
-  const node = tpl.content.firstElementChild!.cloneNode(true) as HTMLElement;
 
-  contactsForm = new OrderContactsForm(node, events);
 
-  const buyer = buyerModel.get();
-  contactsForm.render({
-    email: buyer.email,
-    phone: buyer.phone,
-    errors: buyerModel.validate(),
-  });
 
-  modal.open(contactsForm.render());
-});
-
-events.on('order:pay', async () => {
-  const errors = buyerModel.validate();
-
-  if (errors.email || errors.phone) {
-    if (contactsForm) {
-      contactsForm.render({
-        ...buyerModel.get(),
-        errors,
-      });
-    }
-    return;
-  }
-
-  // дальше: отправка заказа (следующий шаг)
-  // events.emit('order:submit');
-});
 
 
 

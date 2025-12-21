@@ -8,6 +8,7 @@ type PaymentFormData = {
   canSubmit?: boolean;
 };
 
+
 export class OrderPaymentForm extends Form<PaymentFormData> {
   private paymentButtons: HTMLButtonElement[];
 
@@ -21,27 +22,35 @@ export class OrderPaymentForm extends Form<PaymentFormData> {
     // выбор оплаты
     this.paymentButtons.forEach((button) => {
       button.addEventListener('click', () => {
-        this.paymentButtons.forEach((b) =>
-          b.classList.remove('button_alt-active')
-        );
-        button.classList.add('button_alt-active');
+        const method = button.name as 'card' | 'cash';
 
         this.events.emit('form:change', {
           field: 'payment',
-          value: button.dataset.method,
+          value: method,
         });
       });
     });
 
-    // переход ко 2 шагу
-    this.container.addEventListener('submit', (e) => {
+
+    this.submitButton.addEventListener('click', (e) => {
       e.preventDefault();
-    this.events.emit('order:next');
+      this.events.emit('order:next');
+      });
+    }
+
+  set payment(value: 'card' | 'cash' | undefined) {
+    this.paymentButtons.forEach((btn) => {
+      btn.classList.toggle('button_alt-active', btn.name === value);
     });
-
   }
-
   set canSubmit(value: boolean | undefined) {
     this.submitButton.disabled = !value;
+  }
+
+  render(data?: Partial<PaymentFormData>): HTMLElement {
+    if (data?.errors) {
+      this.setErrors(data.errors);
+    }
+    return super.render(data);
   }
 }

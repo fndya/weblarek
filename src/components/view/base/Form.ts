@@ -35,7 +35,5 @@ export abstract class Form<T> extends Component<T> {
         return el;
       })
     );
-
-    this.submitButton.disabled = Object.keys(errors).length > 0;
   }
 }
