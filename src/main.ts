@@ -25,6 +25,8 @@ import { Basket } from './components/view/Basket';
 import { OrderPaymentForm } from './components/view/forms/OrderPaymentForm';
 import { OrderContactsForm } from './components/view/forms/OrderContactsForm';
 
+import { Success } from './components/view/Success';
+
 /* =====================
    ИНИЦИАЛИЗАЦИЯ
 ===================== */
@@ -52,6 +54,12 @@ const modal = new Modal(modalRoot, events);
 const headerEl = document.querySelector('.header') as HTMLElement;
 const header = new Header(headerEl, events);
 
+/* =====================
+   СОСТОЯНИЕ МОДАЛКИ
+===================== */
+
+type ModalView = 'none' | 'basket' | 'preview' | 'order' | 'contacts' | 'success';
+let currentModalView: ModalView = 'none';
 
 /* =====================
    ЗАГРУЗКА КАТАЛОГА
@@ -68,12 +76,8 @@ const header = new Header(headerEl, events);
 
 function renderCatalog() {
   const cards = productModel.getItems().map((product: IProduct) => {
-    const template = document.querySelector<HTMLTemplateElement>(
-      '#card-catalog'
-    )!;
-    const node = template.content.firstElementChild!.cloneNode(
-      true
-    ) as HTMLElement;
+    const template = document.querySelector<HTMLTemplateElement>('#card-catalog')!;
+    const node = template.content.firstElementChild!.cloneNode(true) as HTMLElement;
 
     const card = new CatalogCard(node, {
       onSelect: () => {
@@ -112,7 +116,6 @@ events.on('card:select', (data) => {
   productModel.setPreview(product);
 });
 
-
 /* =====================
    ПРЕВЬЮ ТОВАРА
 ===================== */
@@ -121,12 +124,10 @@ events.on('preview:changed', () => {
   const product = productModel.getPreview();
   if (!product) return;
 
-  const template = document.querySelector<HTMLTemplateElement>(
-    '#card-preview'
-  )!;
-  const node = template.content.firstElementChild!.cloneNode(
-    true
-  ) as HTMLElement;
+  currentModalView = 'preview';
+
+  const template = document.querySelector<HTMLTemplateElement>('#card-preview')!;
+  const node = template.content.firstElementChild!.cloneNode(true) as HTMLElement;
 
   const card = new PreviewCard(node, {
     onBuy: () => {
@@ -151,22 +152,28 @@ events.on('preview:changed', () => {
 });
 
 /* =====================
-   ХЕДЕР СО СЧЕТЧИКОМ
+   ХЕДЕР / СЧЕТЧИК
 ===================== */
 
-
 events.on('basket:changed', () => {
+  // обновляем счётчик всегда
   header.render({
     count: cartModel.getCount(),
   });
-});
 
+  // перерисовываем корзину ТОЛЬКО если она реально открыта
+  if (currentModalView === 'basket') {
+    events.emit('basket:open', {});
+  }
+});
 
 /* =====================
    КОРЗИНА
 ===================== */
 
 events.on('basket:open', () => {
+  currentModalView = 'basket';
+
   const items = cartModel.getItems();
 
   // пустая корзина
@@ -177,14 +184,14 @@ events.on('basket:open', () => {
     return;
   }
 
-  // собираем карточки корзины
+  // карточки корзины
   const basketCards = items.map((product) => {
     const cardTpl = document.querySelector<HTMLTemplateElement>('#card-basket')!;
     const cardNode = cardTpl.content.firstElementChild!.cloneNode(true) as HTMLElement;
 
     const card = new BasketCard(cardNode, {
       onRemove: () => {
-        cartModel.removeItem(product.id);
+        events.emit('product:remove', { id: product.id });
       },
     });
 
@@ -196,7 +203,6 @@ events.on('basket:open', () => {
     return card.render();
   });
 
-  // собираем корзину
   const basketTpl = document.querySelector<HTMLTemplateElement>('#basket')!;
   const basketNode = basketTpl.content.firstElementChild!.cloneNode(true) as HTMLElement;
 
@@ -210,13 +216,9 @@ events.on('basket:open', () => {
   modal.open(basket.render());
 });
 
-events.on('basket:changed', () => {
-  // если модалка открыта — перерисуем корзину через тот же обработчик
-  if (document.querySelector('.modal')?.classList.contains('modal_active')) {
-    events.emit('basket:open', {});
-  }
-});
-
+/* =====================
+   ДОБАВЛЕНИЕ / УДАЛЕНИЕ
+===================== */
 
 events.on('product:add', (data) => {
   const { id } = data as { id: string };
@@ -228,7 +230,6 @@ events.on('product:add', (data) => {
   events.emit('modal:close');
 });
 
-
 events.on('product:remove', (data) => {
   const { id } = data as { id: string };
 
@@ -239,6 +240,7 @@ events.on('product:remove', (data) => {
 /* =====================
    ФОРМЫ
 ===================== */
+
 let orderPaymentForm: OrderPaymentForm | null = null;
 let contactsForm: OrderContactsForm | null = null;
 
@@ -257,9 +259,6 @@ function getPaymentStepErrors() {
   return errors;
 }
 
-
-
-
 function getContactsStepErrors() {
   const buyer = buyerModel.get();
   const errors: Record<string, string> = {};
@@ -275,18 +274,17 @@ function getContactsStepErrors() {
   return errors;
 }
 
-
-
 events.on('order:open', () => {
+  currentModalView = 'order';
+
   const tpl = document.querySelector<HTMLTemplateElement>('#order')!;
   const node = tpl.content.firstElementChild!.cloneNode(true) as HTMLElement;
 
   orderPaymentForm = new OrderPaymentForm(node, events);
-  contactsForm = null; // важно: мы сейчас на шаге 1
+  contactsForm = null;
 
   const buyer = buyerModel.get();
   const errors = getPaymentStepErrors();
-  
 
   orderPaymentForm.render({
     payment: buyer.payment,
@@ -297,7 +295,6 @@ events.on('order:open', () => {
 
   modal.open(orderPaymentForm.render());
 });
-
 
 events.on('buyer:changed', () => {
   const buyer = buyerModel.get();
@@ -314,9 +311,8 @@ events.on('buyer:changed', () => {
     return;
   }
 
-
   if (orderPaymentForm) {
-  const errors = getPaymentStepErrors();
+    const errors = getPaymentStepErrors();
 
     orderPaymentForm.render({
       payment: buyer.payment,
@@ -325,37 +321,7 @@ events.on('buyer:changed', () => {
       canSubmit: Object.keys(errors).length === 0,
     });
   }
-
-
 });
-
-
-
-events.on('order:contacts', () => {
-  const tpl = document.querySelector<HTMLTemplateElement>('#contacts')!;
-  const node = tpl.content.firstElementChild!.cloneNode(true) as HTMLElement;
-
-  orderPaymentForm = null;
-
-  contactsForm = new OrderContactsForm(node, events);
-
-  const buyer = buyerModel.get();
-  const errors = getContactsStepErrors();
-
-  const view = contactsForm.render({
-    email: buyer.email,
-    phone: buyer.phone,
-    errors,
-    canSubmit: Object.keys(errors).length === 0,
-  });
-
-  modal.open(view);
-});
-
-
-
-
-
 
 events.on('form:change', (data) => {
   const { field, value } = data as { field: string; value: string };
@@ -369,6 +335,7 @@ events.on('order:next', () => {
     orderPaymentForm?.render({
       ...buyerModel.get(),
       errors,
+      canSubmit: false,
     });
     return;
   }
@@ -376,11 +343,70 @@ events.on('order:next', () => {
   events.emit('order:contacts');
 });
 
+events.on('order:contacts', () => {
+  currentModalView = 'contacts';
 
+  const tpl = document.querySelector<HTMLTemplateElement>('#contacts')!;
+  const node = tpl.content.firstElementChild!.cloneNode(true) as HTMLElement;
 
+  orderPaymentForm = null;
 
+  contactsForm = new OrderContactsForm(node, events);
 
+  const buyer = buyerModel.get();
+  const errors = getContactsStepErrors();
 
+  modal.open(
+    contactsForm.render({
+      email: buyer.email,
+      phone: buyer.phone,
+      errors,
+      canSubmit: Object.keys(errors).length === 0,
+    })
+  );
+});
 
+events.on('order:pay', async () => {
+  const errors = getContactsStepErrors();
+  if (Object.keys(errors).length > 0) {
+    contactsForm?.render({
+      ...buyerModel.get(),
+      errors,
+      canSubmit: false,
+    });
+    return;
+  }
 
+  const buyer = buyerModel.get();
 
+  const order = {
+    payment: (buyer.payment === 'card' ? 'online' : 'cash') as 'online' | 'cash',
+    email: buyer.email!,
+    phone: buyer.phone!,
+    address: buyer.address!,
+    total: cartModel.getTotal(),
+    items: cartModel.getItems().map((p) => p.id),
+  };
+
+  try {
+    const result = await shopApi.order(order);
+    events.emit('order:success', result);
+  } catch (e) {
+    console.error('Ошибка оформления заказа', e);
+  }
+});
+
+events.on('order:success', ({ total }: { total: number }) => {
+  currentModalView = 'success';
+
+  const tpl = document.querySelector<HTMLTemplateElement>('#success')!;
+  const node = tpl.content.firstElementChild!.cloneNode(true) as HTMLElement;
+
+  const success = new Success(node);
+  success.render({ total });
+
+  modal.open(success.render());
+
+  cartModel.clear();
+  buyerModel.clear();
+});

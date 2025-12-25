@@ -1,5 +1,9 @@
 // src/components/Models/ShopApi.ts
-import type { IProduct } from '../../types';
+import type {
+  IProduct,
+  IOrderRequestApi,
+  IOrderResponse,
+} from '../../types';
 import { Api } from '../base/Api';
 
 interface ProductsResponse {
@@ -15,7 +19,7 @@ export class ShopApi {
     return res.items;
   }
 
-  order(data: Record<string, unknown>): Promise<unknown> {
-    return this.api.post('/order', data);
+  order(data: IOrderRequestApi): Promise<IOrderResponse> {
+    return this.api.post<IOrderResponse>('/order', data);
   }
 }
