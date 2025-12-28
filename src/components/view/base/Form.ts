@@ -7,10 +7,7 @@ export abstract class Form<T> extends Component<T> {
   protected submitButton: HTMLButtonElement;
   protected errorsContainer: HTMLElement;
 
-  constructor(
-    container: HTMLElement,
-    protected readonly events: IEvents
-  ) {
+  constructor(container: HTMLElement, protected readonly events: IEvents) {
     super(container);
 
     this.submitButton = container.querySelector('button[type="submit"]')!;
@@ -25,15 +22,22 @@ export abstract class Form<T> extends Component<T> {
         value: target.value,
       });
     });
+
+    container.addEventListener('submit', (e: Event) => {
+      e.preventDefault();
+
+      const formName = container.getAttribute('name');
+      if (!formName) return;
+
+      this.events.emit(`${formName}:submit`);
+    });
   }
 
-  protected setErrors(errors: FormErrors = {}) {
-    this.errorsContainer.replaceChildren(
-      ...Object.values(errors).map((text) => {
-        const el = document.createElement('div');
-        el.textContent = text;
-        return el;
-      })
-    );
+  set canSubmit(value: boolean | undefined) {
+    this.submitButton.disabled = !value;
+  }
+
+  set errors(value: FormErrors) {
+    this.errorsContainer.textContent = Object.values(value).join('\n');
   }
 }

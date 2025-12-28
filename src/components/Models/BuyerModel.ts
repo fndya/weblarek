@@ -35,7 +35,28 @@ export class BuyerModel {
     return errors;
   }
 
+  validatePaymentStep(): BuyerValidationErrors {
+    const errors: BuyerValidationErrors = {};
+    const { payment, address } = this.data;
+
+    if (!payment) errors.payment = 'Не выбран вид оплаты';
+    if (!address?.trim()) errors.address = 'Укажите адрес доставки';
+
+    return errors;
+  }
+
+  validateContactsStep(): BuyerValidationErrors {
+    const errors: BuyerValidationErrors = {};
+    const { email, phone } = this.data;
+
+    if (!email?.trim()) errors.email = 'Укажите e-mail';
+    if (!phone?.trim()) errors.phone = 'Укажите телефон';
+
+    return errors;
+  }
+
   private emitChange(): void {
     this.events.emit('buyer:changed');
   }
 }
+  

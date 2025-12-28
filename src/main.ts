@@ -10,22 +10,23 @@ import { ShopApi } from './components/Models/ShopApi';
 
 import { Gallery } from './components/view/Gallery';
 import { Modal } from './components/view/Modal';
+import { Header } from './components/view/Header';
 
 import { CatalogCard } from './components/view/cards/CatalogCard';
 import { PreviewCard } from './components/view/cards/PreviewCard';
-
-import { API_URL } from './utils/constants';
-import type { IProduct } from './types';
-
-import { Header } from './components/view/Header';
-
 import { BasketCard } from './components/view/cards/BasketCard';
+
 import { Basket } from './components/view/Basket';
 
 import { OrderPaymentForm } from './components/view/forms/OrderPaymentForm';
 import { OrderContactsForm } from './components/view/forms/OrderContactsForm';
 
 import { Success } from './components/view/Success';
+
+import { API_URL } from './utils/constants';
+import type { IProduct } from './types';
+
+import { ensureElement, cloneTemplate } from './utils/utils';
 
 /* =====================
    ИНИЦИАЛИЗАЦИЯ
@@ -39,27 +40,56 @@ const api = new Api(API_URL, {
 
 const shopApi = new ShopApi(api);
 
-// модели
 const productModel = new ProductModel(events);
 const cartModel = new CartModel(events);
 const buyerModel = new BuyerModel(events);
 
-// view
-const galleryRoot = document.querySelector<HTMLElement>('.gallery')!;
-const modalRoot = document.querySelector<HTMLElement>('.modal')!;
+const galleryRoot = ensureElement<HTMLElement>('.gallery');
+const modalRoot = ensureElement<HTMLElement>('.modal');
+const headerRoot = ensureElement<HTMLElement>('.header');
 
 const gallery = new Gallery(galleryRoot);
 const modal = new Modal(modalRoot, events);
-
-const headerEl = document.querySelector('.header') as HTMLElement;
-const header = new Header(headerEl, events);
+const header = new Header(headerRoot, events);
 
 /* =====================
-   СОСТОЯНИЕ МОДАЛКИ
+   ЗАГРУЗКА ШАБЛОНОВ
 ===================== */
 
-type ModalView = 'none' | 'basket' | 'preview' | 'order' | 'contacts' | 'success';
-let currentModalView: ModalView = 'none';
+const tplCatalog = ensureElement<HTMLTemplateElement>('#card-catalog');
+const tplPreview = ensureElement<HTMLTemplateElement>('#card-preview');
+const tplBasketCard = ensureElement<HTMLTemplateElement>('#card-basket');
+const tplBasket = ensureElement<HTMLTemplateElement>('#basket');
+const tplOrder = ensureElement<HTMLTemplateElement>('#order');
+const tplContacts = ensureElement<HTMLTemplateElement>('#contacts');
+const tplSuccess = ensureElement<HTMLTemplateElement>('#success');
+
+/* =====================
+   ЗАГРУЗКА КАРТОЧЕК
+===================== */
+
+const previewCard = new PreviewCard(cloneTemplate(tplPreview), {
+  onClick: () => {
+    const product = productModel.getPreview();
+    if (!product) return;
+
+    if (cartModel.has(product.id)) {
+      cartModel.removeItem(product.id);
+    } else {
+      if (product.price === null) return;
+      cartModel.addItem(product);
+    }
+
+    modal.close();
+  },
+});
+
+const basketView = new Basket(cloneTemplate(tplBasket), events);
+
+const paymentForm = new OrderPaymentForm(cloneTemplate(tplOrder), events);
+const contactsForm = new OrderContactsForm(cloneTemplate(tplContacts), events);
+
+const successView = new Success(cloneTemplate(tplSuccess), events);
 
 /* =====================
    ЗАГРУЗКА КАТАЛОГА
@@ -76,13 +106,8 @@ let currentModalView: ModalView = 'none';
 
 function renderCatalog() {
   const cards = productModel.getItems().map((product: IProduct) => {
-    const template = document.querySelector<HTMLTemplateElement>('#card-catalog')!;
-    const node = template.content.firstElementChild!.cloneNode(true) as HTMLElement;
-
-    const card = new CatalogCard(node, {
-      onSelect: () => {
-        events.emit('card:select', { id: product.id });
-      },
+    const card = new CatalogCard(cloneTemplate(tplCatalog), {
+      onSelect: () => events.emit('card:select', { id: product.id }),
     });
 
     card.render({
@@ -99,17 +124,14 @@ function renderCatalog() {
   gallery.render({ items: cards });
 }
 
-events.on('catalog:changed', () => {
-  renderCatalog();
-});
+events.on('catalog:changed', renderCatalog);
 
 /* =====================
-   ВЫБОР КАРТОЧКИ
+   ВЫБОР ТОВАРА
 ===================== */
 
 events.on('card:select', (data) => {
   const { id } = data as { id: string };
-
   const product = productModel.getItems().find((p) => p.id === id);
   if (!product) return;
 
@@ -124,215 +146,146 @@ events.on('preview:changed', () => {
   const product = productModel.getPreview();
   if (!product) return;
 
-  currentModalView = 'preview';
+  const inBasket = cartModel.has(product.id);
+  const canBuy = product.price !== null;
 
-  const template = document.querySelector<HTMLTemplateElement>('#card-preview')!;
-  const node = template.content.firstElementChild!.cloneNode(true) as HTMLElement;
+  const buttonText = !canBuy ? 'Недоступно' : inBasket ? 'Удалить' : 'Купить';
 
-  const card = new PreviewCard(node, {
-    onBuy: () => {
-      events.emit('product:add', { id: product.id });
-    },
-    onRemove: () => {
-      events.emit('product:remove', { id: product.id });
-    },
-  });
-
-  card.render({
+  previewCard.render({
     title: product.title,
     price: product.price,
   });
 
-  card.image = product.image;
-  card.description = product.description;
-  card.inBasket = cartModel.has(product.id);
-  card.category = product.category;
+  previewCard.image = product.image;
+  previewCard.description = product.description;
+  previewCard.category = product.category;
 
-  modal.open(card.render());
+  previewCard.buttonText = buttonText;
+  previewCard.buttonDisabled = !canBuy;
+
+  modal.open(previewCard.render());
 });
 
 /* =====================
-   ХЕДЕР / СЧЕТЧИК
+  СЧЕТЧИК В ХЕДЕРЕ
 ===================== */
 
 events.on('basket:changed', () => {
-  // обновляем счётчик всегда
-  header.render({
-    count: cartModel.getCount(),
-  });
+  header.render({ count: cartModel.getCount() });
 
-  // перерисовываем корзину ТОЛЬКО если она реально открыта
-  if (currentModalView === 'basket') {
-    events.emit('basket:open', {});
-  }
+  renderBasket();
 });
 
 /* =====================
-   КОРЗИНА
+   РЕНДЕР ДАННЫХ КОРЗИНЫ
 ===================== */
 
-events.on('basket:open', () => {
-  currentModalView = 'basket';
-
+function renderBasket() {
   const items = cartModel.getItems();
 
-  // пустая корзина
-  if (items.length === 0) {
-    const empty = document.createElement('p');
-    empty.textContent = 'Корзина пуста';
-    modal.open(empty);
-    return;
-  }
-
-  // карточки корзины
-  const basketCards = items.map((product) => {
-    const cardTpl = document.querySelector<HTMLTemplateElement>('#card-basket')!;
-    const cardNode = cardTpl.content.firstElementChild!.cloneNode(true) as HTMLElement;
-
-    const card = new BasketCard(cardNode, {
+  const basketCards = items.map((product, index) => {
+    const card = new BasketCard(cloneTemplate(tplBasketCard), {
       onRemove: () => {
-        events.emit('product:remove', { id: product.id });
+        events.emit('product:remove:basket', { id: product.id });
       },
     });
 
-    card.render({
+    const el = card.render({
       title: product.title,
       price: product.price,
     });
 
-    return card.render();
+    card.index = index + 1;
+
+    return el;
   });
 
-  const basketTpl = document.querySelector<HTMLTemplateElement>('#basket')!;
-  const basketNode = basketTpl.content.firstElementChild!.cloneNode(true) as HTMLElement;
-
-  const basket = new Basket(basketNode, events);
-  basket.render({
+  basketView.render({
     items: basketCards,
     total: cartModel.getTotal(),
     canOrder: cartModel.getCount() > 0,
   });
+}
 
-  modal.open(basket.render());
+
+/* =====================
+   ОТКРЫТИЕ КОРЗИНЫ
+===================== */
+
+events.on('basket:open', () => {
+  renderBasket();
+  modal.open(basketView.render());
 });
 
 /* =====================
-   ДОБАВЛЕНИЕ / УДАЛЕНИЕ
+   УДАЛЕНИЕ ИЗ КОРЗИНЫ
 ===================== */
 
-events.on('product:add', (data) => {
+events.on('product:remove:basket', (data) => {
   const { id } = data as { id: string };
-
-  const product = productModel.getItems().find((p) => p.id === id);
-  if (!product) return;
-
-  cartModel.addItem(product);
-  events.emit('modal:close');
-});
-
-events.on('product:remove', (data) => {
-  const { id } = data as { id: string };
-
   cartModel.removeItem(id);
-  events.emit('modal:close');
 });
 
 /* =====================
-   ФОРМЫ
+   ОФОРМЛЕНИЕ ЗАКАЗА
 ===================== */
-
-let orderPaymentForm: OrderPaymentForm | null = null;
-let contactsForm: OrderContactsForm | null = null;
-
-function getPaymentStepErrors() {
-  const buyer = buyerModel.get();
-  const errors: Record<string, string> = {};
-
-  if (!buyer.payment) {
-    errors.payment = 'Не выбран вид оплаты';
-  }
-
-  if (!buyer.address?.trim()) {
-    errors.address = 'Укажите адрес доставки';
-  }
-
-  return errors;
-}
-
-function getContactsStepErrors() {
-  const buyer = buyerModel.get();
-  const errors: Record<string, string> = {};
-
-  if (!buyer.email?.trim()) {
-    errors.email = 'Укажите e-mail';
-  }
-
-  if (!buyer.phone?.trim()) {
-    errors.phone = 'Укажите телефон';
-  }
-
-  return errors;
-}
 
 events.on('order:open', () => {
-  currentModalView = 'order';
-
-  const tpl = document.querySelector<HTMLTemplateElement>('#order')!;
-  const node = tpl.content.firstElementChild!.cloneNode(true) as HTMLElement;
-
-  orderPaymentForm = new OrderPaymentForm(node, events);
-  contactsForm = null;
-
   const buyer = buyerModel.get();
-  const errors = getPaymentStepErrors();
+  const errors = buyerModel.validatePaymentStep();
 
-  orderPaymentForm.render({
+  paymentForm.render({
     payment: buyer.payment,
     address: buyer.address,
     errors,
     canSubmit: Object.keys(errors).length === 0,
   });
 
-  modal.open(orderPaymentForm.render());
+  modal.open(paymentForm.render());
 });
+
+/* =====================
+   ОБНОВЛЕНИЕ ФОРМ ПРИ buyer:changed
+===================== */
 
 events.on('buyer:changed', () => {
   const buyer = buyerModel.get();
 
-  if (contactsForm) {
-    const errors = getContactsStepErrors();
+  const paymentErrors = buyerModel.validatePaymentStep();
+  paymentForm.render({
+    payment: buyer.payment,
+    address: buyer.address,
+    errors: paymentErrors,
+    canSubmit: Object.keys(paymentErrors).length === 0,
+  });
 
-    contactsForm.render({
-      email: buyer.email,
-      phone: buyer.phone,
-      errors,
-      canSubmit: Object.keys(errors).length === 0,
-    });
-    return;
-  }
-
-  if (orderPaymentForm) {
-    const errors = getPaymentStepErrors();
-
-    orderPaymentForm.render({
-      payment: buyer.payment,
-      address: buyer.address,
-      errors,
-      canSubmit: Object.keys(errors).length === 0,
-    });
-  }
+  const contactErrors = buyerModel.validateContactsStep();
+  contactsForm.render({
+    email: buyer.email,
+    phone: buyer.phone,
+    errors: contactErrors,
+    canSubmit: Object.keys(contactErrors).length === 0,
+  });
 });
+
+/* =====================
+   ИЗМЕНЕНИЯ ПОЛЕЙ ФОРМ
+===================== */
 
 events.on('form:change', (data) => {
   const { field, value } = data as { field: string; value: string };
   buyerModel.set({ [field]: value });
 });
 
-events.on('order:next', () => {
-  const errors = getPaymentStepErrors();
+/* =====================
+   SUBMIT 1-й ФОРМЫ (order:submit)
+===================== */
+
+events.on('order:submit', () => {
+  const errors = buyerModel.validatePaymentStep();
 
   if (Object.keys(errors).length > 0) {
-    orderPaymentForm?.render({
+    paymentForm.render({
       ...buyerModel.get(),
       errors,
       canSubmit: false,
@@ -340,36 +293,32 @@ events.on('order:next', () => {
     return;
   }
 
-  events.emit('order:contacts');
+  openContactsForm();
 });
 
-events.on('order:contacts', () => {
-  currentModalView = 'contacts';
-
-  const tpl = document.querySelector<HTMLTemplateElement>('#contacts')!;
-  const node = tpl.content.firstElementChild!.cloneNode(true) as HTMLElement;
-
-  orderPaymentForm = null;
-
-  contactsForm = new OrderContactsForm(node, events);
-
+function openContactsForm() {
   const buyer = buyerModel.get();
-  const errors = getContactsStepErrors();
+  const errors = buyerModel.validateContactsStep();
 
-  modal.open(
-    contactsForm.render({
-      email: buyer.email,
-      phone: buyer.phone,
-      errors,
-      canSubmit: Object.keys(errors).length === 0,
-    })
-  );
-});
+  contactsForm.render({
+    email: buyer.email,
+    phone: buyer.phone,
+    errors,
+    canSubmit: Object.keys(errors).length === 0,
+  });
 
-events.on('order:pay', async () => {
-  const errors = getContactsStepErrors();
+  modal.open(contactsForm.render());
+}
+
+/* =====================
+   SUBMIT 2-й ФОРМЫ (contacts:submit)
+===================== */
+
+events.on('contacts:submit', async () => {
+  const errors = buyerModel.validateContactsStep();
+
   if (Object.keys(errors).length > 0) {
-    contactsForm?.render({
+    contactsForm.render({
       ...buyerModel.get(),
       errors,
       canSubmit: false,
@@ -390,23 +339,20 @@ events.on('order:pay', async () => {
 
   try {
     const result = await shopApi.order(order);
-    events.emit('order:success', result);
+    showSuccess(result.total);
   } catch (e) {
     console.error('Ошибка оформления заказа', e);
   }
 });
 
-events.on('order:success', ({ total }: { total: number }) => {
-  currentModalView = 'success';
-
-  const tpl = document.querySelector<HTMLTemplateElement>('#success')!;
-  const node = tpl.content.firstElementChild!.cloneNode(true) as HTMLElement;
-
-  const success = new Success(node);
-  success.render({ total });
-
-  modal.open(success.render());
+function showSuccess(total: number) {
+  successView.render({ total });
+  modal.open(successView.render());
 
   cartModel.clear();
   buyerModel.clear();
+}
+
+events.on('success:close', () => {
+  modal.close();
 });

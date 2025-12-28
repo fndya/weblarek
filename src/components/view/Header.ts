@@ -9,7 +9,7 @@ export class Header extends Component<HeaderData> {
   private basketButton: HTMLButtonElement;
   private counterEl: HTMLElement;
 
-  constructor(container: HTMLElement, private events: IEvents) {
+  constructor(container: HTMLElement, private readonly events: IEvents) {
     super(container);
 
     this.basketButton = container.querySelector('.header__basket')!;
@@ -22,6 +22,5 @@ export class Header extends Component<HeaderData> {
 
   set count(value: number) {
     this.counterEl.textContent = String(value);
-    this.counterEl.style.display = value > 0 ? 'block' : 'none';
   }
 }

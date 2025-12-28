@@ -1,4 +1,3 @@
-// src/components/view/cards/BasketCard.ts
 import { Card } from '../base/Card';
 
 interface BasketCardActions {
@@ -9,10 +8,7 @@ export class BasketCard extends Card {
   private indexEl: HTMLElement;
   private buttonEl: HTMLButtonElement;
 
-  constructor(
-    container: HTMLElement,
-    private readonly actions: BasketCardActions
-  ) {
+  constructor(container: HTMLElement, private readonly actions: BasketCardActions) {
     super(container);
 
     this.indexEl = container.querySelector('.basket__item-index')!;

@@ -9,23 +9,30 @@ type ContactsFormData = {
 };
 
 export class OrderContactsForm extends Form<ContactsFormData> {
+  private emailInput: HTMLInputElement;
+  private phoneInput: HTMLInputElement;
+
   constructor(container: HTMLElement, events: IEvents) {
     super(container, events);
 
-    this.submitButton.addEventListener('click', (e) => {
-      e.preventDefault();
-      this.events.emit('order:pay');
-    });
+    this.emailInput = container.querySelector<HTMLInputElement>(
+      'input[name="email"]'
+    )!;
+
+    this.phoneInput = container.querySelector<HTMLInputElement>(
+      'input[name="phone"]'
+    )!;
   }
 
-  set canSubmit(value: boolean | undefined) {
-    this.submitButton.disabled = !value;
+  set email(value: string | undefined) {
+    this.emailInput.value = value ?? '';
   }
 
-  render(data?: Partial<ContactsFormData>): HTMLElement {
-    if (data?.errors) {
-      this.setErrors(data.errors);
-    }
-    return super.render(data);
+  set phone(value: string | undefined) {
+    this.phoneInput.value = value ?? '';
+  }
+
+  set errors(value: Record<string, string>) {
+    super.errors = value;
   }
 }

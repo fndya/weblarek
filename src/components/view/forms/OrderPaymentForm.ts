@@ -2,24 +2,27 @@ import { Form } from '../base/Form';
 import type { IEvents } from '../../base/Events';
 
 type PaymentFormData = {
-  payment?: string;
+  payment?: 'card' | 'cash';
   address?: string;
   errors?: Record<string, string>;
   canSubmit?: boolean;
 };
 
-
 export class OrderPaymentForm extends Form<PaymentFormData> {
   private paymentButtons: HTMLButtonElement[];
+  private addressInput: HTMLInputElement;
 
   constructor(container: HTMLElement, events: IEvents) {
     super(container, events);
 
     this.paymentButtons = Array.from(
-      container.querySelectorAll('.button_alt')
+      container.querySelectorAll<HTMLButtonElement>('.button_alt')
     );
 
-    // выбор оплаты
+    this.addressInput = container.querySelector<HTMLInputElement>(
+      'input[name="address"]'
+    )!;
+
     this.paymentButtons.forEach((button) => {
       button.addEventListener('click', () => {
         const method = button.name as 'card' | 'cash';
@@ -30,27 +33,19 @@ export class OrderPaymentForm extends Form<PaymentFormData> {
         });
       });
     });
-
-
-    this.submitButton.addEventListener('click', (e) => {
-      e.preventDefault();
-      this.events.emit('order:next');
-      });
-    }
+  }
 
   set payment(value: 'card' | 'cash' | undefined) {
     this.paymentButtons.forEach((btn) => {
       btn.classList.toggle('button_alt-active', btn.name === value);
     });
   }
-  set canSubmit(value: boolean | undefined) {
-    this.submitButton.disabled = !value;
+
+  set address(value: string | undefined) {
+    this.addressInput.value = value ?? '';
   }
 
-  render(data?: Partial<PaymentFormData>): HTMLElement {
-    if (data?.errors) {
-      this.setErrors(data.errors);
-    }
-    return super.render(data);
+  set errors(value: Record<string, string>) {
+    super.errors = value;
   }
 }
